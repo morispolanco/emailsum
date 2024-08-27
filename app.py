@@ -5,16 +5,18 @@ from email.header import decode_header
 import requests
 from datetime import datetime, timedelta
 
-# Configuración de las claves API y credenciales
+# Configuración de la clave API de Together
 TOGETHER_API_KEY = st.secrets["TOGETHER_API_KEY"]
-EMAIL = st.secrets["EMAIL"]
-PASSWORD = st.secrets["EMAIL_PASSWORD"]
-IMAP_SERVER = "imap.gmail.com"  # Cambia esto si usas otro proveedor de correo
+IMAP_SERVER = "imap.gmail.com"  # Cambia esto si quieres soportar otros proveedores de correo
 
-def get_emails(date):
+def get_emails(email_address, password, date):
     # Conectar al servidor IMAP
-    mail = imaplib.IMAP4_SSL(IMAP_SERVER)
-    mail.login(EMAIL, PASSWORD)
+    try:
+        mail = imaplib.IMAP4_SSL(IMAP_SERVER)
+        mail.login(email_address, password)
+    except imaplib.IMAP4.error:
+        return None, "Error de autenticación. Por favor, verifica tu email y contraseña."
+
     mail.select("inbox")
 
     # Buscar correos electrónicos de la fecha especificada
@@ -36,7 +38,7 @@ def get_emails(date):
 
     mail.close()
     mail.logout()
-    return emails
+    return emails, None
 
 def synthesize_emails(emails):
     if not emails:
@@ -66,15 +68,25 @@ def synthesize_emails(emails):
 def main():
     st.title("Síntesis Diaria de Correos Electrónicos")
 
+    # Campos de entrada para email y contraseña
+    email_address = st.text_input("Dirección de correo electrónico", key="email")
+    password = st.text_input("Contraseña", type="password", key="password")
+
     # Selector de fecha
     date = st.date_input("Selecciona la fecha para sintetizar los correos:", datetime.now() - timedelta(days=1))
 
     if st.button("Sintetizar Correos"):
-        with st.spinner("Obteniendo y sintetizando correos..."):
-            emails = get_emails(date)
-            synthesis = synthesize_emails(emails)
-            st.subheader(f"Síntesis de correos para {date:%d/%m/%Y}")
-            st.write(synthesis)
+        if not email_address or not password:
+            st.error("Por favor, introduce tu email y contraseña.")
+        else:
+            with st.spinner("Obteniendo y sintetizando correos..."):
+                emails, error = get_emails(email_address, password, date)
+                if error:
+                    st.error(error)
+                else:
+                    synthesis = synthesize_emails(emails)
+                    st.subheader(f"Síntesis de correos para {date:%d/%m/%Y}")
+                    st.write(synthesis)
 
 if __name__ == "__main__":
     main()
